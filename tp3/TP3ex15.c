@@ -1,8 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <err.h>
-
 
 #define MAX_FIELD_SIZE 100
 
@@ -32,17 +30,17 @@ char *readline(char *line, int max_size) {
     return freadline(line, max_size, stdin);
 }
 
-void print_serie(Serie *serie) {
+void print_serie(Serie serie) {
     printf("%s %s %s %s %s %s %s %d %d\n",
-        serie->nome,
-        serie->formato,
-        serie->duracao,
-        serie->pais,
-        serie->idioma,
-        serie->emissora,
-        serie->transmissao,
-        serie->num_temporadas,
-        serie->num_episodios
+        serie.nome,
+        serie.formato,
+        serie.duracao,
+        serie.pais,
+        serie.idioma,
+        serie.emissora,
+        serie.transmissao,
+        serie.num_temporadas,
+        serie.num_episodios
     );
 }
 
@@ -156,136 +154,120 @@ void ler_serie(Serie *serie, char *html) {
 
 #define MAX_LINE_SIZE 250
 #define PREFIXO "/tmp/series/"
+// #define PREFIXO "../entrada e saida/tp02/series/"
 
 int isFim(char line[]) {
     return line[0] == 'F' && line[1] == 'I' && line[2] == 'M';
 }
 
-Serie clonar(Serie *serie) {
-    return *serie;
-}
 
-//começo das coisas de pilha.
-Serie array[100];
-int nPilha = 0;
+
+char* substring(char *destinatario, const char *fonte, int comeco, int fim){
+    while (fim > 0){
+        *destinatario = *(fonte + comeco);
+        destinatario++;
+        fonte++;
+        fim--;
+    }
+   *destinatario = '\0';
+    return destinatario;
+}
 
 typedef struct Celula {
-	Serie elemento;        // Elemento inserido na celula.
-	struct Celula* prox; // Aponta a celula prox.
+    Serie elemento;
+    struct Celula *prox;
 } Celula;
 
-Celula* novaCelula(Serie elemento) {
-   Celula* nova = (Celula*) malloc(sizeof(Celula));
-   nova->elemento = elemento;
-   nova->prox = NULL;
-   return nova;
+Celula *novaCelula(Serie elemento) {
+    Celula *nova = (Celula*) malloc(sizeof(Celula));
+    nova->elemento = elemento;
+    nova->prox = NULL;
+    return nova;
 }
 
-Celula* topo;
+Celula *topo;
 
-/* Cria uma fila sem elementos.*/
-void start () {
-   topo = NULL;
+void start() {
+    topo = NULL;
 }
 
-
-//começo dos metodos descritos no TP.
-void inserir(Serie x) {
-   Celula* tmp = novaCelula(x);
-   tmp->prox = topo;
-   topo = tmp;
-   tmp = NULL;
-   nPilha++;
+void insere(Serie x) {
+    Celula *tmp = novaCelula(x);
+    tmp->prox = topo;
+    topo = tmp;
+    tmp = NULL;
 }
 
-Serie remover() {
-   if (topo == NULL) {
-      errx(1, "Erro ao remover!");
-   }
-
-   Serie resp = topo->elemento;
-   Celula* tmp = topo;
-   topo = topo->prox;
-   tmp->prox = NULL;
-   free(tmp);
-   tmp = NULL;
-   return resp;
-   nPilha--;
-}
-
-void mostrar (){
-   Celula* i;
-
-   for(i = topo; i < nPilha; remover()){
-        printf("%s %s %s %s %s %s %s %i %i\n", (i->elemento).nome, (i->elemento).formato, (i->elemento).duracao,
-        (i->elemento).pais, (i->elemento).idioma, (i->elemento).emissora, (i->elemento).transmissao,
-        (i->elemento).num_temporadas, (i->elemento).num_episodios);
+Serie removerInicio() {
+    if (topo == NULL){ 
+        exit(0);
     }
+    Serie elemento = topo->elemento;
+    Celula *tmp = topo;
+    topo = topo->prox;
+    tmp->prox = NULL;
+    free(tmp);  tmp = NULL;
+    return elemento;
 }
 
-//resto dos metodos necessarios que não são de lista.
-Serie removed[50];
-int removedCount = 0;
-
-Serie acharLer(char entrada[]){
-    Serie serie;
-    char *html = ler_html(entrada);
-    ler_serie(&serie, html);
-    return serie;
-}
-
-void palavrasComando(char *entrada){
-    char diretorio[20] = {"/tmp/series/"};
-    char *temp[3];
-
-    if(entrada[0] == 'I'){
-        temp[0] = strtok(entrada, " "); 
-        temp[1] = strtok(NULL, " ");
-        strcat(diretorio, temp[1]);
-        inserir(acharLer(diretorio));
-    }else if(entrada[0] == 'R'){
-       temp[0] = strtok(entrada," "); 
-       temp[1] = strtok(NULL," "); 
-       strcat(diretorio, temp[1]);
-       remover(acharLer(diretorio));
+void mostrar() {
+    Celula *i;
+    for(i = topo; i != NULL; i = i->prox){
+        print_serie(i->elemento);
     }
-}
-
-void imprimirRemoved(){
-    for(int i = 0; i < removedCount; i++){
-        printf("(R) %s\n", removed[i].nome);
-    }
-}
+} 
 
 int main() {
-    Serie series[100];
-    int nEntrada = 0;
+    
     size_t tam_prefixo = strlen(PREFIXO);
     char line[MAX_LINE_SIZE];
+    int inputCounter = 0;
+    int i = 0;
 
     strcpy(line, PREFIXO);
     readline(line + tam_prefixo, MAX_LINE_SIZE);
 
     while (!isFim(line + tam_prefixo)) {
+        Serie serie;
         char *html = ler_html(line);
-        ler_serie(&series[nEntrada], html);
-        inserir(series[nEntrada]);
+        ler_serie(&serie, html);
+        insere(serie);
         free(html);
+        inputCounter++;
         readline(line + tam_prefixo, MAX_LINE_SIZE);
-        nEntrada++;
-    }
-
-    // lendo demais inputs e interpretando as palavras comando.
-    int amount;
-    scanf("%i", &amount);
-    char varComandos[amount][MAX_LINE_SIZE];
-
-    for(int i = 0; i < amount; i++){
-        scanf(" %[^\n]s", varComandos[i]);
-        palavrasComando(varComandos[i]);
     }
     
-    imprimirRemoved();
+    int amount;
+    scanf("%d", &amount);
+
+    for(int i = 0; i < amount; i++){
+        char aux[MAX_LINE_SIZE];
+        char preifxo[MAX_LINE_SIZE];
+
+        Serie serie;
+
+        fgets(aux, MAX_LINE_SIZE, stdin);
+        remove_line_break(aux);
+
+        if(aux[0] == 'I'){
+            substring(aux, aux, 2, 50);
+            strcpy(preifxo, PREFIXO);
+            strcat(preifxo, aux);
+            char *html = ler_html(preifxo);
+            ler_serie(&serie, html);
+            free(html);
+            insere(serie);
+
+        }else if(aux[0] == 'R'){
+            printf("(R) ");
+            char nomeDaSerie[MAX_LINE_SIZE];
+            strcpy(nomeDaSerie, removerInicio().nome );
+            printf("%s", nomeDaSerie);
+            printf("\n");
+        }
+    }
+
     mostrar();
+
     return EXIT_SUCCESS;
 }
